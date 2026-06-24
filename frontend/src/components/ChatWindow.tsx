@@ -79,8 +79,11 @@ export function ChatWindow({ messages, onSendMessage, onAddToCalendar, isLoading
   };
 
   const handleConfirmAdd = () => {
-    // Parse date and add to calendar
-    const dateStr = selectedEvent.date.split(' ')[0]; // Get just the date part
+    // Parse date - if it contains spaces, take first part (e.g., "2026-08-01 at 8:00 PM" -> "2026-08-01")
+    // Otherwise use as-is (e.g., "2026-08-01")
+    const dateStr = selectedEvent.date.includes(' ')
+      ? selectedEvent.date.split(' ')[0]
+      : selectedEvent.date;
     onAddToCalendar(dateStr);
     setModalOpen(false);
     setSelectedEvent({ name: '', date: '' });
@@ -117,6 +120,12 @@ export function ChatWindow({ messages, onSendMessage, onAddToCalendar, isLoading
 
             return (
               <div key={event.eventId} className="event-recommendation-card">
+                {event.score !== undefined && (
+                  <div className="score-badge-pill">
+                    {event.score}/135
+                  </div>
+                )}
+
                 <h3 className="event-card-name">{event.name}</h3>
 
                 <div className="event-card-location-date">
@@ -125,7 +134,6 @@ export function ChatWindow({ messages, onSendMessage, onAddToCalendar, isLoading
 
                 {event.score !== undefined && (
                   <div className="event-card-score">
-                    <div className="score-label">Score: {event.score}/135</div>
                     <div className="score-bar">
                       <div
                         className="score-fill"
@@ -143,7 +151,7 @@ export function ChatWindow({ messages, onSendMessage, onAddToCalendar, isLoading
 
                 <button
                   className="add-to-calendar-button"
-                  onClick={() => handleAddToCalendarClick(event.name, dateTimeStr || '')}
+                  onClick={() => handleAddToCalendarClick(event.name, event.date || '')}
                 >
                   Add to Campaign Calendar
                 </button>
@@ -230,7 +238,7 @@ export function ChatWindow({ messages, onSendMessage, onAddToCalendar, isLoading
       <ConfirmModal
         isOpen={modalOpen}
         title="Add to Campaign Calendar"
-        message={`Add ${selectedEvent} to your campaign calendar?`}
+        message={`Add ${selectedEvent.name} to your campaign calendar?`}
         onConfirm={handleConfirmAdd}
         onCancel={handleCancelAdd}
       />
