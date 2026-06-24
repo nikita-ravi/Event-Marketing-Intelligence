@@ -148,7 +148,13 @@ export async function searchEvents(
   client: TicketmasterClient,
   params: SearchEventsParams
 ): Promise<TrimmedEvent[]> {
-  const cacheKey = getCacheKey(params);
+  // Set default size to 10 and enforce hard cap of 10
+  const cappedParams = {
+    ...params,
+    size: Math.min(params.size || 10, 10)
+  };
+
+  const cacheKey = getCacheKey(cappedParams);
 
   // Check cache
   const cached = cache.get(cacheKey);
@@ -160,7 +166,7 @@ export async function searchEvents(
   console.log(`[Cache MISS] Fetching fresh data from Ticketmaster`);
 
   // Fetch fresh data
-  const rawResponse = await client.searchEvents(params);
+  const rawResponse = await client.searchEvents(cappedParams);
   const shaped = shapeEvents(rawResponse);
 
   // Update cache
