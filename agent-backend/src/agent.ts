@@ -68,7 +68,7 @@ export class EventCampaignAgent {
 
     // Initial call to Claude
     let response = await this.anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20240620',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages,
@@ -133,7 +133,7 @@ export class EventCampaignAgent {
       } as any);
 
       response = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages,
