@@ -19,6 +19,12 @@ import { logger } from './logger.js';
  * tracks search results for validation, and enforces structured output
  * through the present_recommendation tool.
  */
+export type PipelineEvent = {
+  step: 'search' | 'baseline' | 'reasoning' | 'guardrail' | 'result';
+  status: 'running' | 'done' | 'failed';
+  details?: string;
+};
+
 export class LangChainEventAgent {
   private mcpClient: MCPClient;
   private tools: DynamicStructuredTool[] = [];
@@ -31,7 +37,11 @@ export class LangChainEventAgent {
   private lastSearchEventsData: any[] = []; // Full event objects from search_events
   private lastRecommendations: any = null;  // Recommendations from present_recommendation
 
-  constructor(mcpClient: MCPClient, apiKey: string) {
+  // Event callback for SSE streaming
+  private onEvent?: (event: PipelineEvent) => void;
+
+  constructor(mcpClient: MCPClient, apiKey: string, onEvent?: (event: PipelineEvent) => void) {
+    this.onEvent = onEvent;
     this.mcpClient = mcpClient;
 
     // Initialize Claude with low temperature for business reasoning
@@ -88,6 +98,8 @@ export class LangChainEventAgent {
           keyword: z.string().optional().describe('Keyword search'),
         }),
         func: async (input) => {
+          this.onEvent?.({ step: 'search', status: 'running', details: 'Ticketmaster API • Searching...' });
+
           const mcpResult = await this.mcpClient.callTool('search_events', input);
 
           // Extract actual data from MCP protocol wrapper
@@ -103,6 +115,8 @@ export class LangChainEventAgent {
           if (Array.isArray(parsedData)) {
             this.lastSearchEventsData = [...this.lastSearchEventsData, ...parsedData];
           }
+
+          this.onEvent?.({ step: 'search', status: 'done', details: `Ticketmaster API • ${this.lastSearchResults.length} results` });
 
           logger.info('Search events: Tracked candidate eventIds', {
             count: this.lastSearchResults.length,
@@ -141,6 +155,8 @@ export class LangChainEventAgent {
           brandCategory: z.string().describe('Brand category (e.g., restaurant, qsr, retail, etc.)'),
         }),
         func: async (input) => {
+          this.onEvent?.({ step: 'baseline', status: 'running', details: 'Deterministic • Calculating...' });
+
           logger.info('Tool called: score_events_baseline', {
             eventsCount: input.events?.length || 0,
             brandCategory: input.brandCategory,
@@ -158,6 +174,8 @@ export class LangChainEventAgent {
             resultType: typeof parsedData,
             scoredEventsCount: Array.isArray(parsedData) ? parsedData.length : 0,
           });
+
+          this.onEvent?.({ step: 'baseline', status: 'done', details: 'Deterministic • 135pt max' });
 
           return actualData;
         },
@@ -213,8 +231,13 @@ export class LangChainEventAgent {
           clarifyingQuestion: z.string().optional().describe('Optional follow-up question if you need more context'),
         }),
         func: async (input) => {
+          this.onEvent?.({ step: 'reasoning', status: 'running', details: 'Context-aware adjustment' });
+
           // Call the MCP tool first to get schema validation
           const mcpResult = await this.mcpClient.callTool('present_recommendation', input);
+
+          this.onEvent?.({ step: 'reasoning', status: 'done', details: 'Context-aware adjustment' });
+          this.onEvent?.({ step: 'guardrail', status: 'running', details: 'Validate event IDs' });
 
           logger.info('Present recommendation: Calling validation guardrail', {
             recommendationCount: input.recommendations.length,
@@ -246,8 +269,13 @@ export class LangChainEventAgent {
           // Validation PASSED - return LLM recommendations
           logger.info('Validation PASSED - returning LLM recommendations');
 
+          this.onEvent?.({ step: 'guardrail', status: 'done', details: 'Validate event IDs' });
+          this.onEvent?.({ step: 'result', status: 'running', details: 'Schema-enforced output' });
+
           // Store recommendations for /chat endpoint to return
           this.lastRecommendations = validationResult.output.recommendations;
+
+          this.onEvent?.({ step: 'result', status: 'done', details: 'Schema-enforced output' });
 
           return JSON.stringify({
             validationPassed: true,

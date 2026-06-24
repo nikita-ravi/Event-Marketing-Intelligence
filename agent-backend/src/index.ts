@@ -117,6 +117,90 @@ app.post('/chat', async (req, res) => {
 });
 
 /**
+ * POST /chat-stream
+ * Send a message with Server-Sent Events for real-time pipeline updates
+ */
+app.post('/chat-stream', async (req, res) => {
+  const startTime = Date.now();
+
+  try {
+    if (!langchainMcpClient) {
+      return res.status(503).json({ error: 'MCP client not initialized' });
+    }
+
+    const { message } = req.body;
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    logger.info('User message received (streaming)', {
+      message: message.substring(0, 100),
+      messageLength: message.length
+    });
+
+    // Create temporary agent with event callback
+    const streamingAgent = new LangChainEventAgent(
+      langchainMcpClient,
+      ANTHROPIC_API_KEY!,
+      (event) => {
+        // Send SSE event to frontend
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
+    );
+    await streamingAgent.initializeAgent(SYSTEM_PROMPT);
+
+    // Convert history to LangChain format
+    const chatHistory = streamingAgent.formatChatHistory(langchainHistory);
+
+    const response = await streamingAgent.sendMessage(message, chatHistory);
+    const duration = Date.now() - startTime;
+
+    // Get enriched recommendations
+    const recommendations = streamingAgent.getEnrichedRecommendations();
+
+    // Add to history
+    langchainHistory.push({ role: 'user', content: message });
+    langchainHistory.push({ role: 'assistant', content: response });
+
+    // Send final response
+    res.write(`data: ${JSON.stringify({
+      type: 'final',
+      message: response,
+      recommendations: recommendations,
+      history: langchainHistory,
+    })}\n\n`);
+
+    res.end();
+
+    logger.info('Agent response generated (streaming)', {
+      responseLength: response.length,
+      duration,
+      hybridReasoning: true,
+      hasRecommendations: recommendations !== null,
+      recommendationCount: recommendations?.length || 0
+    });
+
+    logApiCall('/chat-stream', 'POST', duration, 200, { framework: 'langchain', streaming: true });
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    logger.error('Chat stream error', { error: error instanceof Error ? error.message : 'Unknown error', duration });
+    logApiCall('/chat-stream', 'POST', duration, 500);
+
+    res.write(`data: ${JSON.stringify({
+      type: 'error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })}\n\n`);
+    res.end();
+  }
+});
+
+/**
  * POST /reset
  * Reset the conversation history
  */

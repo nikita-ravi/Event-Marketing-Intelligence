@@ -31,61 +31,6 @@ function App() {
     savedEvents: 0,
   });
 
-  // Simulate pipeline progression
-  const simulatePipeline = async () => {
-    // Reset pipeline
-    setPipeline(initialPipelineState);
-
-    // Step 1: Search events
-    setPipeline((prev) => ({
-      ...prev,
-      search: { status: 'running', details: 'Ticketmaster API • Searching...' },
-    }));
-
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    setPipeline((prev) => ({
-      ...prev,
-      search: { status: 'done', details: 'Ticketmaster API • 10 results' },
-      baseline: { status: 'running', details: 'Deterministic • Calculating...' },
-    }));
-
-    // Step 2: Baseline scoring
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    setPipeline((prev) => ({
-      ...prev,
-      baseline: { status: 'done', details: 'Deterministic • 135pt max' },
-      reasoning: { status: 'running', details: 'Context-aware adjustment' },
-    }));
-
-    // Step 3: LLM reasoning
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    setPipeline((prev) => ({
-      ...prev,
-      reasoning: { status: 'done', details: 'Context-aware adjustment' },
-      guardrail: { status: 'running', details: 'Validate event IDs' },
-    }));
-
-    // Step 4: Guardrail check
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    setPipeline((prev) => ({
-      ...prev,
-      guardrail: { status: 'done', details: 'Validate event IDs' },
-      result: { status: 'running', details: 'Schema-enforced output' },
-    }));
-
-    // Step 5: Present result
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    setPipeline((prev) => ({
-      ...prev,
-      result: { status: 'done', details: 'Schema-enforced output' },
-    }));
-  };
-
   const sendMessage = async (content: string) => {
     // Add user message immediately
     const userMessage: Message = { role: 'user', content };
@@ -93,14 +38,15 @@ function App() {
     setIsLoading(true);
     setError(null);
 
-    // Start pipeline simulation
-    simulatePipeline();
+    // Reset pipeline
+    setPipeline(initialPipelineState);
 
     // Update stats
     setStats((prev) => ({ ...prev, queries: prev.queries + 1 }));
 
     try {
-      const response = await fetch(`${API_URL}/chat`, {
+      // Use fetch to POST message, then receive SSE stream
+      const response = await fetch(`${API_URL}/chat-stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,30 +55,57 @@ function App() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get response');
+        throw new Error('Failed to get response');
       }
 
-      const data = await response.json();
+      if (!response.body) {
+        throw new Error('No response body');
+      }
 
-      // Add assistant response
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: data.message || data.response,
-        recommendations: data.recommendations || null,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      // Read SSE stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
 
-      // Update current recommendations state
-      setRecommendations(data.recommendations || null);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      // Update stats
-      if (data.recommendations) {
-        setStats((prev) => ({
-          ...prev,
-          eventsFound: prev.eventsFound + data.recommendations.length,
-          guardrailStatus: 'pass',
-        }));
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'final') {
+              // Final response with message and recommendations
+              const assistantMessage: Message = {
+                role: 'assistant',
+                content: data.message,
+                recommendations: data.recommendations || null,
+              };
+              setMessages((prev) => [...prev, assistantMessage]);
+              setRecommendations(data.recommendations || null);
+
+              // Update stats
+              if (data.recommendations) {
+                setStats((prev) => ({
+                  ...prev,
+                  eventsFound: prev.eventsFound + data.recommendations.length,
+                  guardrailStatus: 'pass',
+                }));
+              }
+            } else if (data.type === 'error') {
+              throw new Error(data.error);
+            } else if (data.step) {
+              // Pipeline event - update pipeline state
+              setPipeline((prev) => ({
+                ...prev,
+                [data.step]: { status: data.status, details: data.details },
+              }));
+            }
+          }
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
