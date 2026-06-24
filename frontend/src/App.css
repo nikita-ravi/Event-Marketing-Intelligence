@@ -121,8 +121,10 @@ body {
   color: #555;
 }
 
-.message {
-  margin-bottom: 20px;
+/* Message Bubbles */
+.message-bubble {
+  margin-bottom: 16px;
+  display: flex;
   animation: fadeIn 0.3s ease;
 }
 
@@ -137,44 +139,185 @@ body {
   }
 }
 
-.message-role {
-  font-weight: 600;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
-  color: #666;
+.message-bubble.user {
+  justify-content: flex-end;
 }
 
-.message.user .message-role {
-  color: #667eea;
+.message-bubble.assistant {
+  justify-content: flex-start;
 }
 
-.message.assistant .message-role {
-  color: #764ba2;
+.message-bubble .message-content {
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  line-height: 1.5;
+  word-wrap: break-word;
 }
 
-.message-content {
-  background: white;
-  padding: 15px;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  line-height: 1.6;
-}
-
-.message.user .message-content {
+.message-bubble.user .message-content {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.message-bubble.user .message-content p {
+  margin: 0;
   color: white;
 }
 
-.message-content p {
-  margin: 8px 0;
+.message-bubble.assistant .message-content {
+  background: white;
+  color: #333;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .message-content.loading {
   display: flex;
   gap: 5px;
-  padding: 15px 20px;
+  padding: 12px 16px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Markdown styling in assistant messages */
+.message-bubble.assistant .message-content h1,
+.message-bubble.assistant .message-content h2,
+.message-bubble.assistant .message-content h3 {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.message-bubble.assistant .message-content h1 {
+  font-size: 1.5rem;
+}
+
+.message-bubble.assistant .message-content h2 {
+  font-size: 1.3rem;
+}
+
+.message-bubble.assistant .message-content h3 {
+  font-size: 1.1rem;
+}
+
+.message-bubble.assistant .message-content p {
+  margin: 8px 0;
+}
+
+.message-bubble.assistant .message-content ul,
+.message-bubble.assistant .message-content ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.message-bubble.assistant .message-content li {
+  margin: 4px 0;
+}
+
+.message-bubble.assistant .message-content strong {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.message-bubble.assistant .message-content code {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* Event Recommendation Cards */
+.event-recommendations {
+  margin: 20px 0;
+}
+
+.event-recommendation-card {
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.event-recommendation-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.event-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.event-number {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+  border-radius: 16px;
+  min-width: 36px;
+  text-align: center;
+}
+
+.event-card-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+  flex: 1;
+}
+
+.event-card-detail {
+  margin: 8px 0;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.event-card-detail strong {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.event-card-rationale {
+  margin: 12px 0;
+  padding: 12px;
+  background: white;
+  border-left: 4px solid #667eea;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #555;
+}
+
+.event-card-rationale strong {
+  color: #764ba2;
+  font-weight: 600;
+}
+
+.add-to-calendar-button {
+  margin-top: 12px;
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.add-to-calendar-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
 .dot {
@@ -460,6 +603,18 @@ body {
   .reset-button {
     position: static;
     margin-top: 15px;
+  }
+
+  .message-bubble .message-content {
+    max-width: 85%;
+  }
+
+  .event-recommendation-card {
+    padding: 12px;
+  }
+
+  .event-card-name {
+    font-size: 1.1rem;
   }
 
   .event-rank {
