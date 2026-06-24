@@ -15,7 +15,14 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Initial MVP - Event-Triggered Campaign Advisor\n\nComplete 3-tier architecture implementation for event discovery and campaign recommendations:\n\n## Architecture\n- MCP Server: Event discovery tools \\(Ticketmaster API\\)\n- Agent Backend: Claude-powered orchestration with tool-calling\n- Frontend: React chat interface\n\n## Features Implemented\n✅ MCP server with 3 tools:\n  - search_events: Ticketmaster API integration with response shaping & caching\n  - get_event_details: Detailed event information retrieval\n  - recommend_campaign_window: Deterministic scoring algorithm with explainable rationale\n\n✅ Agent backend:\n  - Anthropic SDK integration with Claude 3.5 Sonnet\n  - MCP client spawning server as child process\n  - Tool-calling loop with conversation history\n  - Express API with /chat, /reset, /health endpoints\n\n✅ Frontend:\n  - Vite + React + TypeScript\n  - Chat interface with real-time messaging\n  - Error handling and loading states\n  - Responsive gradient UI\n\n## Security\n- API keys in .env files \\(gitignored\\)\n- .env.example files for setup\n- No secrets in frontend build\n\n## Testing\n- Standalone MCP server test script\n- CLI agent test interface\n- End-to-end integration verified\n\nBuilt for InMarket AI Builder Challenge.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push:*)",
       "Bash(python3:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebSearch",
+      "Bash(npm run dev:*)",
+      "Bash(node test-new-features.js:*)",
+      "Bash(tsx test:*)",
+      "Bash(npx tsx test-new-fields.ts)",
+      "Bash(git fetch:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

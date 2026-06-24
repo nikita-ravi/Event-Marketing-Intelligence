@@ -8,9 +8,18 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "tsx src/test-search.ts"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:manual": "tsx src/test-search.ts"
   },
-  "keywords": ["mcp", "ticketmaster", "events", "marketing"],
+  "keywords": [
+    "mcp",
+    "ticketmaster",
+    "events",
+    "marketing"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -19,8 +28,10 @@
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
+    "@types/node": "^20.19.43",
+    "@vitest/ui": "^4.1.9",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.9"
   }
 }

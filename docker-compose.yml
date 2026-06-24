@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # Agent Backend Service
+  agent-backend:
+    build:
+      context: ./agent-backend
+      dockerfile: Dockerfile
+    container_name: event-marketing-agent
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY}
+      - MCP_SERVER_PATH=../mcp-server/dist/index.js
+    volumes:
+      # Mount MCP server for stdio communication
+      - ./mcp-server/dist:/app/mcp-server/dist:ro
+    depends_on:
+      - mcp-server
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+  # MCP Server Service
+  # Note: This runs as a standalone service but communicates via stdio with agent-backend
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: event-marketing-mcp
+    environment:
+      - NODE_ENV=production
+      - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY}
+      - CACHE_DURATION_MS=900000
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: event-marketing-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - agent-backend
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mcp-data:
+    driver: local
