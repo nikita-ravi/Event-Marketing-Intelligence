@@ -169,8 +169,6 @@ export function ChatWindow({ messages, onSendMessage, onAddToCalendar, isLoading
         <div className="messages-container">
           {messages.length === 0 && (
             <div className="empty-state">
-              <h2>Event Campaign Advisor</h2>
-              <p>Ask me to find events for your brand's next campaign.</p>
               <div className="example-queries">
                 <p><strong>Try asking:</strong></p>
                 <ul>

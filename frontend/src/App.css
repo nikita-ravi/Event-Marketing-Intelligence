@@ -68,17 +68,17 @@ body {
   justify-content: space-between;
   height: 56px;
   padding: 0 calc(var(--spacing-unit) * 3);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #ffffff;
+  border-bottom: 0.5px solid #E5E5E3;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
 }
 
 .app-header h1 {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   margin: 0;
-  color: white;
-  letter-spacing: -0.3px;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
 }
 
 .app-subtitle {
@@ -87,20 +87,19 @@ body {
 
 .reset-button {
   padding: calc(var(--spacing-unit)) calc(var(--spacing-unit) * 2.5);
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
+  background: var(--bg-white);
+  border: 1px solid var(--border-medium);
+  color: var(--text-secondary);
   border-radius: calc(var(--spacing-unit));
   cursor: pointer;
   font-size: 0.8125rem;
   font-weight: 500;
   transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
 }
 
 .reset-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: var(--bg-gray);
+  border-color: var(--border-medium);
 }
 
 .app-main {
@@ -127,44 +126,54 @@ body {
 }
 
 .empty-state {
-  text-align: center;
-  padding: calc(var(--spacing-unit) * 10) calc(var(--spacing-unit) * 3);
-  color: var(--text-secondary);
-}
-
-.empty-state h2 {
-  font-size: 1.5rem;
-  margin-bottom: calc(var(--spacing-unit) * 2);
-  color: var(--text-primary);
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: calc(var(--spacing-unit) * 3);
 }
 
 .example-queries {
-  margin-top: calc(var(--spacing-unit) * 5);
   text-align: left;
   max-width: 600px;
-  margin-left: auto;
-  margin-right: auto;
-  background: var(--bg-gray);
+  background: var(--bg-white);
   padding: calc(var(--spacing-unit) * 3);
   border-radius: calc(var(--spacing-unit) * 1.5);
   border: 1px solid var(--border-light);
 }
 
+.example-queries p {
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.example-queries strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 .example-queries ul {
   list-style: none;
-  margin-top: calc(var(--spacing-unit) * 2);
+  margin: 0;
 }
 
 .example-queries li {
   padding: calc(var(--spacing-unit) * 1.5);
   margin: calc(var(--spacing-unit)) 0;
-  background: var(--bg-white);
+  background: var(--bg-gray);
   border-radius: calc(var(--spacing-unit));
   font-style: italic;
   color: var(--text-secondary);
   font-size: 0.875rem;
   border: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.example-queries li:hover {
+  background: var(--bg-white);
+  border-color: var(--border-medium);
 }
 
 /* Message Bubbles */
