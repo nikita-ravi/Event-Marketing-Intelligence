@@ -44,6 +44,12 @@ function App() {
     // Update stats
     setStats((prev) => ({ ...prev, queries: prev.queries + 1 }));
 
+    // Get last turn only (last user message + last assistant response)
+    // This provides context for follow-ups without sending full history
+    const lastTurn = messages.length >= 2
+      ? messages.slice(-2).map(msg => ({ role: msg.role, content: msg.content }))
+      : [];
+
     try {
       // Use fetch to POST message, then receive SSE stream
       const response = await fetch(`${API_URL}/chat-stream`, {
@@ -51,7 +57,10 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({
+          message: content,
+          chatHistory: lastTurn
+        }),
       });
 
       if (!response.ok) {

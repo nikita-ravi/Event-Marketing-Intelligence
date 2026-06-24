@@ -128,7 +128,7 @@ app.post('/chat-stream', async (req, res) => {
       return res.status(503).json({ error: 'MCP client not initialized' });
     }
 
-    const { message } = req.body;
+    const { message, chatHistory } = req.body;
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
@@ -141,7 +141,8 @@ app.post('/chat-stream', async (req, res) => {
 
     logger.info('User message received (streaming)', {
       message: message.substring(0, 100),
-      messageLength: message.length
+      messageLength: message.length,
+      historyTurns: chatHistory ? chatHistory.length : 0
     });
 
     // Create temporary agent with event callback
@@ -155,10 +156,13 @@ app.post('/chat-stream', async (req, res) => {
     );
     await streamingAgent.initializeAgent(SYSTEM_PROMPT);
 
-    // Convert history to LangChain format
-    const chatHistory = streamingAgent.formatChatHistory(langchainHistory);
+    // Use last turn only (chatHistory from frontend) instead of full langchainHistory
+    // This keeps token costs low while enabling relevant follow-ups
+    const lastTurnHistory = chatHistory && Array.isArray(chatHistory)
+      ? streamingAgent.formatChatHistory(chatHistory)
+      : [];
 
-    const response = await streamingAgent.sendMessage(message, chatHistory);
+    const response = await streamingAgent.sendMessage(message, lastTurnHistory);
     const duration = Date.now() - startTime;
 
     // Get enriched recommendations
