@@ -14,10 +14,24 @@ function shapeEventDetails(rawEvent: any): EventDetails {
     classifications?.subGenre?.name ||
     'Unknown';
 
+  // Extract genre and subGenre
+  const genre = classifications?.genre?.name || null;
+  const subGenre = classifications?.subGenre?.name || null;
+
   // Extract venue info
   const venue = rawEvent._embedded?.venues?.[0];
   const venueName = venue?.name || 'Unknown Venue';
+  const venueId = venue?.id || '';
   const city = venue?.city?.name || 'Unknown City';
+  const stateCode = venue?.state?.stateCode || null;
+
+  // Extract location coordinates
+  const lat = venue?.location?.latitude
+    ? parseFloat(venue.location.latitude)
+    : null;
+  const lon = venue?.location?.longitude
+    ? parseFloat(venue.location.longitude)
+    : null;
 
   // Build address from available components
   let address: string | null = null;
@@ -56,6 +70,29 @@ function shapeEventDetails(rawEvent: any): EventDetails {
     }
   }
 
+  // Extract images
+  const images = rawEvent.images
+    ? rawEvent.images.map((img: any) => ({
+        url: img.url,
+        width: img.width,
+        height: img.height
+      }))
+    : [];
+
+  // Extract attractions (artists/teams)
+  const attractions = rawEvent._embedded?.attractions
+    ? rawEvent._embedded.attractions.map((attr: any) => ({
+        id: attr.id,
+        name: attr.name,
+        url: attr.url || null
+      }))
+    : [];
+
+  // Extract on-sale dates
+  const onsaleStartDate = rawEvent.sales?.public?.startDateTime || null;
+  const onsaleEndDate = rawEvent.sales?.public?.endDateTime || null;
+  const presaleStartDate = rawEvent.sales?.presales?.[0]?.startDateTime || null;
+
   // Extract URL
   const url = rawEvent.url || '';
 
@@ -65,16 +102,27 @@ function shapeEventDetails(rawEvent: any): EventDetails {
     date,
     time,
     venue: {
+      id: venueId,
       name: venueName,
       address,
       city,
+      stateCode,
+      lat,
+      lon,
       parkingDetail,
       accessibleSeatingDetail,
       capacity
     },
     classification,
+    genre,
+    subGenre,
+    attractions,
     priceRanges,
-    url
+    images,
+    url,
+    onsaleStartDate,
+    onsaleEndDate,
+    presaleStartDate
   };
 }
 

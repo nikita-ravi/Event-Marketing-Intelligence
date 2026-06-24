@@ -11,6 +11,8 @@ import { TicketmasterClient } from './ticketmasterClient.js';
 import { searchEvents } from './tools/searchEvents.js';
 import { getEventDetails } from './tools/getEventDetails.js';
 import { recommendCampaignWindow } from './tools/recommendCampaignWindow.js';
+import { searchAttractions } from './tools/searchAttractions.js';
+import { getAttractionTour } from './tools/getAttractionTour.js';
 import { TrimmedEvent } from './types.js';
 
 // Load environment variables
@@ -46,26 +48,67 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: 'search_events',
         description:
-          'Search for upcoming events in a region. Returns trimmed event data with venue, classification, pricing. Use this BEFORE making recommendations.',
+          'Search for upcoming events in a region. Supports geographic radius search, genre/attraction filters, and on-sale date filtering. Returns trimmed event data with venue, classification, pricing, images, and attractions. Use this BEFORE making recommendations.',
         inputSchema: {
           type: 'object',
           properties: {
+            // Location filters (priority: geoPoint > latlong > dmaId > city)
+            geoPoint: {
+              type: 'string',
+              description: 'GeoHash for precise location targeting',
+            },
+            latlong: {
+              type: 'string',
+              description: 'Latitude,longitude (e.g., "34.0522,-118.2437") for radius search',
+            },
+            radius: {
+              type: 'number',
+              description: 'Search radius (use with latlong)',
+            },
+            unit: {
+              type: 'string',
+              description: 'Radius unit: "miles" or "km" (default: miles)',
+              enum: ['miles', 'km'],
+            },
             dmaId: {
               type: 'string',
-              description: 'DMA (Designated Market Area) ID - preferred over city',
+              description: 'DMA (Designated Market Area) ID - preferred over city for regional targeting',
             },
             city: {
               type: 'string',
-              description: 'City name (if dmaId not available)',
+              description: 'City name (if dmaId/latlong not available)',
             },
             stateCode: {
               type: 'string',
               description: 'Two-letter state code (used with city)',
             },
+            // Classification filters
             classificationName: {
               type: 'string',
               description: 'Event classification filter (Music, Sports, Arts & Theatre, Family, etc.)',
             },
+            genreId: {
+              type: 'string',
+              description: 'Genre ID for precision targeting (get from attractions or API docs)',
+            },
+            subGenreId: {
+              type: 'string',
+              description: 'Sub-genre ID for ultra-precise audience targeting',
+            },
+            segmentId: {
+              type: 'string',
+              description: 'Segment ID (top-level classification)',
+            },
+            // Attraction/venue filters
+            attractionId: {
+              type: 'string',
+              description: 'Filter by specific attraction (artist/team) - use search_attractions first',
+            },
+            venueId: {
+              type: 'string',
+              description: 'Filter by specific venue',
+            },
+            // Date/time filters
             startDateTime: {
               type: 'string',
               description: 'Start date/time in ISO 8601 format (e.g., 2024-06-01T00:00:00Z)',
@@ -74,9 +117,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'End date/time in ISO 8601 format',
             },
+            onsaleStartDateTime: {
+              type: 'string',
+              description: 'Filter events going on sale after this date (ticket sales timing intelligence)',
+            },
+            onsaleEndDateTime: {
+              type: 'string',
+              description: 'Filter events going on sale before this date',
+            },
+            // Other filters
             size: {
               type: 'number',
               description: 'Maximum number of results (default: 20)',
+            },
+            includeFamily: {
+              type: 'string',
+              description: 'Family-friendly filter: "yes", "no", or "only"',
+              enum: ['yes', 'no', 'only'],
+            },
+            keyword: {
+              type: 'string',
+              description: 'Keyword search (event name, venue, attractions)',
             },
           },
           required: ['startDateTime', 'endDateTime'],
@@ -118,6 +179,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
           },
           required: ['events', 'brandCategory'],
+        },
+      },
+      {
+        name: 'search_attractions',
+        description:
+          'Search for attractions (artists, teams, performers) by keyword. Use this to find attraction IDs before getting tour details or filtering events.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            keyword: {
+              type: 'string',
+              description: 'Search keyword (artist name, team name, performer)',
+            },
+          },
+          required: ['keyword'],
+        },
+      },
+      {
+        name: 'get_attraction_tour',
+        description:
+          'Get all upcoming events for a specific attraction (artist/team). Enables tour tracking - marketers can follow artists across all tour dates for campaign planning. Returns attraction details + all upcoming events in next year.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            attractionId: {
+              type: 'string',
+              description: 'Ticketmaster attraction ID (get from search_attractions)',
+            },
+          },
+          required: ['attractionId'],
         },
       },
     ],
@@ -165,6 +256,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(recommendations, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'search_attractions': {
+        const { keyword } = args as { keyword: string };
+        const attractions = await searchAttractions(tmClient, keyword);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(attractions, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_attraction_tour': {
+        const { attractionId } = args as { attractionId: string };
+        const tour = await getAttractionTour(tmClient, attractionId);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(tour, null, 2),
             },
           ],
         };

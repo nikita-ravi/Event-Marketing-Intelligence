@@ -12,13 +12,31 @@ const CACHE_DURATION = parseInt(process.env.CACHE_DURATION_MS || '900000'); // 1
 
 function getCacheKey(params: SearchEventsParams): string {
   return JSON.stringify({
+    // Location filters
     dmaId: params.dmaId || null,
     city: params.city || null,
     state: params.stateCode || null,
+    geoPoint: params.geoPoint || null,
+    latlong: params.latlong || null,
+    radius: params.radius || null,
+    unit: params.unit || null,
+    // Classification filters
     classification: params.classificationName || null,
+    genreId: params.genreId || null,
+    subGenreId: params.subGenreId || null,
+    segmentId: params.segmentId || null,
+    // Attraction/venue filters
+    attractionId: params.attractionId || null,
+    venueId: params.venueId || null,
+    // Date/time filters
     start: params.startDateTime,
     end: params.endDateTime,
-    size: params.size || 20
+    onsaleStart: params.onsaleStartDateTime || null,
+    onsaleEnd: params.onsaleEndDateTime || null,
+    // Other filters
+    size: params.size || 20,
+    includeFamily: params.includeFamily || null,
+    keyword: params.keyword || null
   });
 }
 
@@ -40,10 +58,17 @@ function shapeEvents(rawResponse: any): TrimmedEvent[] {
       classifications?.subGenre?.name ||
       'Unknown';
 
+    // Extract genre and subGenre
+    const genre = classifications?.genre?.name || null;
+    const subGenre = classifications?.subGenre?.name || null;
+
     // Extract venue info
     const venue = event._embedded?.venues?.[0];
     const venueName = venue?.name || 'Unknown Venue';
+    const venueId = venue?.id || null;
+    const venueCapacity = venue?.capacity ? parseInt(venue.capacity, 10) : null;
     const city = venue?.city?.name || 'Unknown City';
+    const stateCode = venue?.state?.stateCode || null;
 
     // Extract location coordinates
     const lat = venue?.location?.latitude
@@ -52,6 +77,9 @@ function shapeEvents(rawResponse: any): TrimmedEvent[] {
     const lon = venue?.location?.longitude
       ? parseFloat(venue.location.longitude)
       : null;
+
+    // Extract distance if available (from geo-based search)
+    const distance = event.distance ? parseFloat(event.distance) : null;
 
     // Extract date/time
     const dates = event.dates?.start;
@@ -70,17 +98,45 @@ function shapeEvents(rawResponse: any): TrimmedEvent[] {
       }
     }
 
+    // Extract image (first image if available)
+    const imageUrl =
+      event.images && event.images.length > 0 ? event.images[0].url : null;
+
+    // Extract URL
+    const url = event.url || null;
+
+    // Extract on-sale date
+    const onsaleStartDate = event.sales?.public?.startDateTime || null;
+
+    // Extract attractions (artists/teams)
+    const attractions = event._embedded?.attractions
+      ? event._embedded.attractions.map((attr: any) => ({
+          id: attr.id,
+          name: attr.name
+        }))
+      : null;
+
     return {
       id: event.id,
       name: event.name,
       date,
       time,
       classification,
+      genre,
+      subGenre,
       venueName,
+      venueId,
+      venueCapacity,
       city,
+      stateCode,
       lat,
       lon,
-      priceRange
+      distance,
+      priceRange,
+      imageUrl,
+      url,
+      onsaleStartDate,
+      attractions
     };
   });
 }

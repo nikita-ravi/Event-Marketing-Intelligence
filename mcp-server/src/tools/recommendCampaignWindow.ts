@@ -133,6 +133,35 @@ function scoreEvent(
     reasons.push('premium ticket pricing indicates engaged audience');
   }
 
+  // 5. Venue capacity (0-15 points) - larger venues = more potential reach
+  if (event.venueCapacity) {
+    if (event.venueCapacity >= 20000) {
+      score += 15;
+      reasons.push(`arena-scale venue (${event.venueCapacity.toLocaleString()} capacity)`);
+    } else if (event.venueCapacity >= 5000) {
+      score += 10;
+      reasons.push(`large venue (${event.venueCapacity.toLocaleString()} capacity)`);
+    } else if (event.venueCapacity >= 1000) {
+      score += 5;
+      reasons.push(`medium venue (${event.venueCapacity.toLocaleString()} capacity)`);
+    }
+  }
+
+  // 6. Distance proximity (0-10 points) - closer events for hyper-local campaigns
+  // Only applies when distance is available (geo-based search)
+  if (event.distance !== null && event.distance !== undefined) {
+    if (event.distance <= 5) {
+      score += 10;
+      reasons.push(`hyper-local (${event.distance.toFixed(1)}mi away)`);
+    } else if (event.distance <= 10) {
+      score += 7;
+      reasons.push(`nearby (${event.distance.toFixed(1)}mi away)`);
+    } else if (event.distance <= 25) {
+      score += 4;
+      reasons.push(`metro area (${event.distance.toFixed(1)}mi away)`);
+    }
+  }
+
   // Build rationale string
   const rationale = reasons.length > 0
     ? reasons.join('; ')
