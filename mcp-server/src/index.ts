@@ -10,9 +10,10 @@ import dotenv from 'dotenv';
 import { TicketmasterClient } from './ticketmasterClient.js';
 import { searchEvents } from './tools/searchEvents.js';
 import { getEventDetails } from './tools/getEventDetails.js';
-import { recommendCampaignWindow } from './tools/recommendCampaignWindow.js';
+import { scoreEventsBaseline } from './tools/scoreEventsBaseline.js';
 import { searchAttractions } from './tools/searchAttractions.js';
 import { getAttractionTour } from './tools/getAttractionTour.js';
+import { presentRecommendation, PresentRecommendationInput } from './tools/presentRecommendation.js';
 import { TrimmedEvent } from './types.js';
 
 // Load environment variables
@@ -159,9 +160,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'recommend_campaign_window',
+        name: 'score_events_baseline',
         description:
-          'Recommend which events are best for ad spend based on brand category. Uses deterministic scoring (NOT LLM) with explainable rationale. Call this after search_events.',
+          'Get deterministic baseline scores for events based on brand category. This is the auditable scoring layer (0-135 points) that provides the foundation for LLM reasoning. Uses deterministic rules, NOT an LLM. Call this after search_events to get baseline scores before applying context-aware adjustments.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -211,6 +212,43 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['attractionId'],
         },
       },
+      {
+        name: 'present_recommendation',
+        description:
+          'FINAL ANSWER TOOL - Use this to present your recommendations to the user. This is REQUIRED for all final recommendations - never give free-text responses. Ensures structured, validated output with adjusted scores and LLM-generated rationale.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            recommendations: {
+              type: 'array',
+              description: 'Array of recommended events with adjusted scores and rationale',
+              items: {
+                type: 'object',
+                properties: {
+                  eventId: {
+                    type: 'string',
+                    description: 'Event ID from search_events results - MUST exist in candidate list',
+                  },
+                  adjustedScore: {
+                    type: 'number',
+                    description: 'Your adjusted score based on user context (can differ from baseline)',
+                  },
+                  rationale: {
+                    type: 'string',
+                    description: 'Your explanation of why this event is recommended for this campaign',
+                  },
+                },
+                required: ['eventId', 'adjustedScore', 'rationale'],
+              },
+            },
+            clarifyingQuestion: {
+              type: 'string',
+              description: 'Optional follow-up question if you need more context',
+            },
+          },
+          required: ['recommendations'],
+        },
+      },
     ],
   };
 });
@@ -245,17 +283,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case 'recommend_campaign_window': {
+      case 'score_events_baseline': {
         const { events, brandCategory } = args as {
           events: TrimmedEvent[];
           brandCategory: string;
         };
-        const recommendations = recommendCampaignWindow(events, brandCategory);
+        const baselineScores = scoreEventsBaseline(events, brandCategory);
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(recommendations, null, 2),
+              text: JSON.stringify(baselineScores, null, 2),
             },
           ],
         };
@@ -282,6 +320,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             {
               type: 'text',
               text: JSON.stringify(tour, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'present_recommendation': {
+        const input = args as PresentRecommendationInput;
+        const result = presentRecommendation(input);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2),
             },
           ],
         };

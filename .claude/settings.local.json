@@ -22,7 +22,22 @@
       "Bash(tsx test:*)",
       "Bash(npx tsx test-new-fields.ts)",
       "Bash(git fetch:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(cd:*)",
+      "Bash(npm run test-cli:*)",
+      "Bash(timeout 20 npm run test-cli)",
+      "Bash(pkill:*)",
+      "Bash(chmod:*)",
+      "Bash(tee:*)",
+      "Bash(timeout 90 bash -c 'echo \"\"\"\"Find events for my restaurant in Washington DC in the next two weeks\"\"\"\" | npm run test-cli')",
+      "Bash(node -e \"import\\(''@langchain/langgraph/prebuilt''\\).then\\(m => console.log\\(Object.keys\\(m\\)\\)\\)\")",
+      "Bash(ls:*)",
+      "Bash(npx tsx test-auto.ts)",
+      "Bash(npx tsx:*)",
+      "WebFetch(domain:langgraphjs.guide)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint)",
+      "Bash(npm start)"
     ]
   }
 }

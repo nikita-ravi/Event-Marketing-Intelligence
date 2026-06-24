@@ -171,10 +171,17 @@ function scoreEvent(
 }
 
 /**
- * Recommend campaign windows from events
- * DETERMINISTIC - no LLM calls, fully explainable scoring
+ * Score events baseline - deterministic scoring algorithm
+ *
+ * This provides the auditable baseline scores (0-135 points) that the LLM
+ * reasoning layer can then adjust based on user context. The scoring is:
+ * - Deterministic (same inputs = same outputs)
+ * - Explainable (rationale shows which weights fired)
+ * - Auditable (no black-box AI)
+ *
+ * The LLM applies reasoning on top of these baseline scores via present_recommendation.
  */
-export function recommendCampaignWindow(
+export function scoreEventsBaseline(
   events: TrimmedEvent[],
   brandCategory: string
 ): ScoredEvent[] {

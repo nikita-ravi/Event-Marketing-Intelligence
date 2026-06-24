@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ConfirmModal } from './ConfirmModal';
+import { SuggestionChips } from './SuggestionChips';
 
 export interface EventRecommendation {
   eventId: string;
@@ -24,18 +25,36 @@ export interface Message {
 interface ChatWindowProps {
   messages: Message[];
   onSendMessage: (message: string) => void;
+  onAddToCalendar: (eventDate: string) => void;
   isLoading: boolean;
 }
 
-export function ChatWindow({ messages, onSendMessage, isLoading }: ChatWindowProps) {
+export function ChatWindow({ messages, onSendMessage, onAddToCalendar, isLoading }: ChatWindowProps) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<string>('');
+  const [selectedEvent, setSelectedEvent] = useState<{ name: string; date: string }>({ name: '', date: '' });
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Generate suggestions based on last assistant message
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'assistant' && lastMessage.recommendations) {
+        // Generate contextual suggestions
+        const newSuggestions = [
+          'Show more events in this city',
+          'Compare venue capacities',
+          'Filter by weekend dates only',
+        ];
+        setSuggestions(newSuggestions);
+      }
+    }
   }, [messages]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -43,24 +62,33 @@ export function ChatWindow({ messages, onSendMessage, isLoading }: ChatWindowPro
     if (input.trim() && !isLoading) {
       onSendMessage(input.trim());
       setInput('');
+      setSuggestions([]);
     }
   };
 
-  const handleAddToCalendar = (eventName: string) => {
-    setSelectedEvent(eventName);
+  const handleSuggestionClick = (suggestion: string) => {
+    if (!isLoading) {
+      onSendMessage(suggestion);
+      setSuggestions([]);
+    }
+  };
+
+  const handleAddToCalendarClick = (eventName: string, eventDate: string) => {
+    setSelectedEvent({ name: eventName, date: eventDate });
     setModalOpen(true);
   };
 
   const handleConfirmAdd = () => {
-    // TODO: Implement calendar integration
-    console.log('Added to calendar:', selectedEvent);
+    // Parse date and add to calendar
+    const dateStr = selectedEvent.date.split(' ')[0]; // Get just the date part
+    onAddToCalendar(dateStr);
     setModalOpen(false);
-    setSelectedEvent('');
+    setSelectedEvent({ name: '', date: '' });
   };
 
   const handleCancelAdd = () => {
     setModalOpen(false);
-    setSelectedEvent('');
+    setSelectedEvent({ name: '', date: '' });
   };
 
   // Render assistant message with event cards
@@ -115,7 +143,7 @@ export function ChatWindow({ messages, onSendMessage, isLoading }: ChatWindowPro
 
                 <button
                   className="add-to-calendar-button"
-                  onClick={() => handleAddToCalendar(event.name)}
+                  onClick={() => handleAddToCalendarClick(event.name, dateTimeStr || '')}
                 >
                   Add to Campaign Calendar
                 </button>
@@ -170,6 +198,15 @@ export function ChatWindow({ messages, onSendMessage, isLoading }: ChatWindowPro
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Suggestion chips */}
+        {suggestions.length > 0 && (
+          <SuggestionChips
+            suggestions={suggestions}
+            onSuggestionClick={handleSuggestionClick}
+            disabled={isLoading}
+          />
+        )}
 
         <form onSubmit={handleSubmit} className="input-form">
           <input
