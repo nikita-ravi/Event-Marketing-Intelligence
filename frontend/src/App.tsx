@@ -193,12 +193,7 @@ function App() {
       {/* Main Content */}
       <div className="app-main-content">
         <header className="app-header">
-          <div className="header-content">
-            <h1>Event Campaign Advisor</h1>
-            <p className="app-subtitle">
-              Powered by MCP • Ticketmaster • Claude
-            </p>
-          </div>
+          <h1>Event Campaign Advisor</h1>
           {messages.length > 0 && (
             <button className="reset-button" onClick={resetConversation}>
               New conversation
