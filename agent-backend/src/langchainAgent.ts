@@ -28,6 +28,8 @@ export class LangChainEventAgent {
   // State tracking for validation guardrails
   private lastSearchResults: string[] = []; // Valid eventIds from search_events
   private lastBaselineResults: any = null;  // Fallback data from score_events_baseline
+  private lastSearchEventsData: any[] = []; // Full event objects from search_events
+  private lastRecommendations: any = null;  // Recommendations from present_recommendation
 
   constructor(mcpClient: MCPClient, apiKey: string) {
     this.mcpClient = mcpClient;
@@ -90,11 +92,18 @@ export class LangChainEventAgent {
 
           // Extract actual data from MCP protocol wrapper
           const actualData = mcpResult.content[0].text;
+          const parsedData = JSON.parse(actualData);
 
           // Track event IDs for validation guardrail
           // Accumulate across multiple search calls instead of overwriting
           const newEventIds = extractEventIds(actualData);
           this.lastSearchResults = [...new Set([...this.lastSearchResults, ...newEventIds])];
+
+          // Also track full event objects for enrichment later
+          if (Array.isArray(parsedData)) {
+            this.lastSearchEventsData = [...this.lastSearchEventsData, ...parsedData];
+          }
+
           logger.info('Search events: Tracked candidate eventIds', {
             count: this.lastSearchResults.length,
             eventIds: this.lastSearchResults,
@@ -236,6 +245,10 @@ export class LangChainEventAgent {
 
           // Validation PASSED - return LLM recommendations
           logger.info('Validation PASSED - returning LLM recommendations');
+
+          // Store recommendations for /chat endpoint to return
+          this.lastRecommendations = validationResult.output.recommendations;
+
           return JSON.stringify({
             validationPassed: true,
             ...validationResult.output,
@@ -276,6 +289,8 @@ export class LangChainEventAgent {
     // Reset search results for this new user message
     // Prevents event IDs from bleeding between conversations
     this.lastSearchResults = [];
+    this.lastSearchEventsData = [];
+    this.lastRecommendations = null;
 
     logger.info('Agent invoke starting', { message });
 
@@ -312,6 +327,50 @@ export class LangChainEventAgent {
       });
       throw error;
     }
+  }
+
+  /**
+   * Get enriched recommendations with full event details
+   * Returns null if no recommendations were made
+   */
+  getEnrichedRecommendations() {
+    if (!this.lastRecommendations || this.lastRecommendations.length === 0) {
+      return null;
+    }
+
+    // Create a map of eventId -> event for quick lookup
+    const eventMap = new Map();
+    for (const event of this.lastSearchEventsData) {
+      eventMap.set(event.id, event);
+    }
+
+    // Enrich recommendations with full event data
+    const enriched = this.lastRecommendations.map((rec: any) => {
+      const event = eventMap.get(rec.eventId);
+      if (!event) {
+        logger.warn('Event not found for recommendation', { eventId: rec.eventId });
+        return {
+          eventId: rec.eventId,
+          score: rec.adjustedScore,
+          rationale: rec.rationale,
+        };
+      }
+
+      return {
+        eventId: event.id,
+        name: event.name,
+        venue: event.venueName,
+        city: event.city,
+        date: event.date,
+        time: event.time,
+        score: rec.adjustedScore,
+        rationale: rec.rationale,
+        classification: event.classification,
+        priceRange: event.priceRange,
+      };
+    });
+
+    return enriched;
   }
 
   /**

@@ -2,25 +2,29 @@ import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ConfirmModal } from './ConfirmModal';
 
+export interface EventRecommendation {
+  eventId: string;
+  name: string;
+  venue?: string;
+  city?: string;
+  date?: string;
+  time?: string | null;
+  score?: number;
+  rationale?: string;
+  classification?: string;
+  priceRange?: { min: number; max: number } | null;
+}
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
+  recommendations?: EventRecommendation[] | null;
 }
 
 interface ChatWindowProps {
   messages: Message[];
   onSendMessage: (message: string) => void;
   isLoading: boolean;
-}
-
-interface EventRecommendation {
-  number: number;
-  name: string;
-  venue?: string;
-  date?: string;
-  score?: string;
-  rationale?: string;
-  fullText: string;
 }
 
 export function ChatWindow({ messages, onSendMessage, isLoading }: ChatWindowProps) {
@@ -59,112 +63,66 @@ export function ChatWindow({ messages, onSendMessage, isLoading }: ChatWindowPro
     setSelectedEvent('');
   };
 
-  // Parse event recommendations from assistant message
-  const parseEventRecommendations = (content: string): EventRecommendation[] => {
-    const events: EventRecommendation[] = [];
-
-    // Match numbered recommendations (e.g., "### 1. **Event Name**" or "1. **Event Name**")
-    const pattern = /(?:^|\n)(?:###\s+)?(\d+)\.\s+\*\*([^*]+)\*\*/g;
-    let match;
-
-    while ((match = pattern.exec(content)) !== null) {
-      const number = parseInt(match[1]);
-      const name = match[2].trim();
-      const startIdx = match.index;
-
-      // Find the end of this recommendation (next number or end of content)
-      const nextMatch = pattern.exec(content);
-      const endIdx = nextMatch ? nextMatch.index : content.length;
-      pattern.lastIndex = nextMatch ? nextMatch.index : content.length;
-
-      const fullText = content.substring(startIdx, endIdx).trim();
-
-      // Extract venue, date, score from the recommendation text
-      const venueMatch = fullText.match(/(?:Venue:|📍)\s*\*\*([^*]+)\*\*/);
-      const dateMatch = fullText.match(/(?:Date:|📅)\s*([^\n]+)/);
-      const scoreMatch = fullText.match(/Score:\s*(\d+(?:\/\d+)?)/i);
-
-      // Extract rationale (text after "Why" or "Rationale")
-      const rationaleMatch = fullText.match(/(?:Why[^:]*:|Rationale:)\s*([^\n]+(?:\n(?!###|\d+\.)[^\n]+)*)/i);
-
-      events.push({
-        number,
-        name,
-        venue: venueMatch ? venueMatch[1].trim() : undefined,
-        date: dateMatch ? dateMatch[1].trim() : undefined,
-        score: scoreMatch ? scoreMatch[1] : undefined,
-        rationale: rationaleMatch ? rationaleMatch[1].trim() : undefined,
-        fullText
-      });
-    }
-
-    return events;
-  };
-
   // Render assistant message with event cards
-  const renderAssistantMessage = (content: string) => {
-    const events = parseEventRecommendations(content);
-
-    if (events.length === 0) {
+  const renderAssistantMessage = (content: string, recommendations?: EventRecommendation[] | null) => {
+    if (!recommendations || recommendations.length === 0) {
       // No event recommendations, render as normal markdown
       return <ReactMarkdown>{content}</ReactMarkdown>;
     }
 
-    // Split content into parts: before events, events, after events
-    const firstEventIdx = content.indexOf(events[0].fullText);
-    const lastEvent = events[events.length - 1];
-    const lastEventIdx = content.indexOf(lastEvent.fullText) + lastEvent.fullText.length;
-
-    const beforeEvents = content.substring(0, firstEventIdx);
-    const afterEvents = content.substring(lastEventIdx);
-
+    // Render markdown content and event cards
     return (
       <>
-        {beforeEvents && <ReactMarkdown>{beforeEvents}</ReactMarkdown>}
+        <ReactMarkdown>{content}</ReactMarkdown>
 
         <div className="event-recommendations">
-          {events.map((event) => (
-            <div key={event.number} className="event-recommendation-card">
-              <div className="event-card-header">
-                <span className="event-number">#{event.number}</span>
+          {recommendations.map((event, index) => {
+            const dateTimeStr = event.time
+              ? `${event.date} at ${event.time}`
+              : event.date;
+
+            const locationStr = event.city
+              ? `${event.venue}, ${event.city}`
+              : event.venue;
+
+            const scorePercentage = event.score ? (event.score / 135) * 100 : 0;
+
+            return (
+              <div key={event.eventId} className="event-recommendation-card">
                 <h3 className="event-card-name">{event.name}</h3>
+
+                <div className="event-card-location-date">
+                  {locationStr} • {dateTimeStr}
+                </div>
+
+                {event.score !== undefined && (
+                  <div className="event-card-score">
+                    <div className="score-label">Score: {event.score}/135</div>
+                    <div className="score-bar">
+                      <div
+                        className="score-fill"
+                        style={{ width: `${scorePercentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {event.rationale && (
+                  <div className="event-card-rationale">
+                    {event.rationale}
+                  </div>
+                )}
+
+                <button
+                  className="add-to-calendar-button"
+                  onClick={() => handleAddToCalendar(event.name)}
+                >
+                  Add to Campaign Calendar
+                </button>
               </div>
-
-              {event.venue && (
-                <div className="event-card-detail">
-                  <strong>Venue:</strong> {event.venue}
-                </div>
-              )}
-
-              {event.date && (
-                <div className="event-card-detail">
-                  <strong>Date:</strong> {event.date}
-                </div>
-              )}
-
-              {event.score && (
-                <div className="event-card-detail">
-                  <strong>Score:</strong> {event.score}
-                </div>
-              )}
-
-              {event.rationale && (
-                <div className="event-card-rationale">
-                  <strong>Why:</strong> {event.rationale}
-                </div>
-              )}
-
-              <button
-                className="add-to-calendar-button"
-                onClick={() => handleAddToCalendar(event.name)}
-              >
-                Add to Campaign Calendar
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
-
-        {afterEvents && <ReactMarkdown>{afterEvents}</ReactMarkdown>}
       </>
     );
   };
@@ -194,7 +152,7 @@ export function ChatWindow({ messages, onSendMessage, isLoading }: ChatWindowPro
                 {msg.role === 'user' ? (
                   <p>{msg.content}</p>
                 ) : (
-                  renderAssistantMessage(msg.content)
+                  renderAssistantMessage(msg.content, msg.recommendations)
                 )}
               </div>
             </div>

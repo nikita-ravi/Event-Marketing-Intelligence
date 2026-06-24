@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ChatWindow, type Message } from './components/ChatWindow';
+import { ChatWindow, type Message, type EventRecommendation } from './components/ChatWindow';
 import './App.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [recommendations, setRecommendations] = useState<EventRecommendation[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,9 +36,13 @@ function App() {
       // Add assistant response
       const assistantMessage: Message = {
         role: 'assistant',
-        content: data.response,
+        content: data.message || data.response, // Support both old and new format
+        recommendations: data.recommendations || null,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Update current recommendations state
+      setRecommendations(data.recommendations || null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);

@@ -237,10 +237,11 @@ body {
   background: #f8f9fa;
   border: 1px solid #e0e0e0;
   border-radius: 12px;
-  padding: 16px;
+  padding: 20px;
   margin: 12px 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-align: left;
 }
 
 .event-recommendation-card:hover {
@@ -248,61 +249,58 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
-.event-card-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.event-number {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  font-weight: 700;
-  font-size: 0.9rem;
-  padding: 6px 12px;
-  border-radius: 16px;
-  min-width: 36px;
-  text-align: center;
-}
-
 .event-card-name {
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   font-weight: 700;
   color: #333;
-  margin: 0;
-  flex: 1;
+  margin: 0 0 12px 0;
+  line-height: 1.3;
 }
 
-.event-card-detail {
-  margin: 8px 0;
+.event-card-location-date {
   font-size: 0.95rem;
-  color: #555;
+  color: #666;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.event-card-detail strong {
-  color: #667eea;
+.event-card-score {
+  margin-bottom: 16px;
+}
+
+.score-label {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 6px;
   font-weight: 600;
+}
+
+.score-bar {
+  width: 100%;
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.score-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
 
 .event-card-rationale {
-  margin: 12px 0;
-  padding: 12px;
-  background: white;
-  border-left: 4px solid #667eea;
-  border-radius: 4px;
+  margin-bottom: 16px;
   font-size: 0.95rem;
   line-height: 1.6;
   color: #555;
-}
-
-.event-card-rationale strong {
-  color: #764ba2;
-  font-weight: 600;
+  text-align: left;
 }
 
 .add-to-calendar-button {
-  margin-top: 12px;
   width: 100%;
   padding: 12px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
