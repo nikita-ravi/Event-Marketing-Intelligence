@@ -154,6 +154,9 @@ export async function searchEvents(
     size: Math.min(params.size || 10, 10)
   };
 
+  // Log what parameters Claude decided to use
+  console.log('[LLM Decision] Claude chose these API parameters:', JSON.stringify(cappedParams, null, 2));
+
   const cacheKey = getCacheKey(cappedParams);
 
   // Check cache
