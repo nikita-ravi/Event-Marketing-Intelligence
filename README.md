@@ -108,7 +108,7 @@ event-marketing/
 | Requirement | Version | Notes |
 |---|---|---|
 | Node.js | v20+ | [nodejs.org](https://nodejs.org) |
-| Python | 3.10+ | For guardrails-service only |
+| Python | 3.10–3.12 | For guardrails-service only. **Not 3.13/3.14** — NeMo Guardrails 0.10 doesn't support them yet |
 | Ticketmaster API key | Free | [developer.ticketmaster.com](https://developer.ticketmaster.com/) → Create App |
 | Anthropic API key | Paid | [console.anthropic.com](https://console.anthropic.com/) |
 | NVIDIA API key | Free tier | [build.nvidia.com](https://build.nvidia.com/) → Get API Key (for NeMo Guardrails) |
@@ -191,7 +191,7 @@ npm run dev
 ```bash
 # Terminal 3 — Guardrails service (optional but recommended)
 cd guardrails-service
-python -m venv venv
+python3.11 -m venv venv           # use Python 3.10–3.12, NOT 3.13/3.14
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8001
