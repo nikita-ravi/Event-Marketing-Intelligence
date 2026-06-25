@@ -1,5 +1,6 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { DynamicStructuredTool } from '@langchain/core/tools';
+import { HumanMessage, AIMessage, SystemMessage, ToolMessage, BaseMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { MCPClient } from './mcpClient.js';
@@ -30,6 +31,9 @@ export class LangChainEventAgent {
   private tools: DynamicStructuredTool[] = [];
   private model: ChatAnthropic;
   private agent: any = null; // LangGraph CompiledStateGraph type
+
+  // Saved system prompt — used to prime the forced-first-tool-call step
+  private systemPrompt: string = '';
 
   // State tracking for validation guardrails
   private lastSearchResults: string[] = []; // Valid eventIds from search_events
@@ -111,7 +115,7 @@ export class LangChainEventAgent {
           const newEventIds = extractEventIds(actualData);
           this.lastSearchResults = [...new Set([...this.lastSearchResults, ...newEventIds])];
 
-          // Also track full event objects for enrichment later
+          // Track full event objects for enrichment later (kept in memory, not sent to LLM)
           if (Array.isArray(parsedData)) {
             this.lastSearchEventsData = [...this.lastSearchEventsData, ...parsedData];
           }
@@ -123,7 +127,15 @@ export class LangChainEventAgent {
             eventIds: this.lastSearchResults,
           });
 
-          return actualData;
+          // Return a slim payload to the LLM — drop fields the LLM doesn't reason about
+          // (imageUrl, url, lat, lon, stateCode, venueId, subGenre) to reduce context size
+          const slimEvents = Array.isArray(parsedData)
+            ? parsedData.map(({ id, name, date, time, classification, genre, venueName, venueCapacity, city, distance, priceRange, onsaleStartDate, attractions }: any) =>
+                ({ id, name, date, time, classification, genre, venueName, venueCapacity, city, distance, priceRange, onsaleStartDate, attractions })
+              )
+            : parsedData;
+
+          return JSON.stringify(slimEvents);
         },
       })
     );
@@ -290,6 +302,7 @@ export class LangChainEventAgent {
    * Initialize the LangChain agent with system prompt
    */
   async initializeAgent(systemPrompt: string) {
+    this.systemPrompt = systemPrompt;
     // Latest LangChain uses createReactAgent from @langchain/langgraph/prebuilt
     // Pass system prompt via messageModifier which prepends it to every conversation
     this.agent = createReactAgent({
@@ -315,22 +328,61 @@ export class LangChainEventAgent {
     }
 
     // Reset search results for this new user message
-    // Prevents event IDs from bleeding between conversations
     this.lastSearchResults = [];
     this.lastSearchEventsData = [];
     this.lastRecommendations = null;
 
     logger.info('Agent invoke starting', { message });
 
+    // ── Forced first tool call ────────────────────────────────────────────────
+    // The ReAct agent at temperature 0.2 skips tool calls when it "knows" the
+    // answer from training data. We fix this by forcing the model to call at
+    // least one tool on the first step (tool_choice: "any"), then handing off to
+    // the regular ReAct loop with that first call already in the message history.
+    // The LLM still chooses WHICH tool — we only remove its option to skip them.
+    const forcedToolMessages: BaseMessage[] = [];
     try {
-      // Latest LangGraph API uses 'messages' instead of 'input' and 'chat_history'
-      // Set a reasonable timeout to prevent hanging indefinitely
+      const historyMessages: BaseMessage[] = chatHistory.map(([role, content]: any) =>
+        role === 'human' ? new HumanMessage(String(content)) : new AIMessage(String(content))
+      );
+
+      const forcedModel = this.model.bindTools(this.tools, { tool_choice: 'any' } as any);
+      const primeMessages = [
+        new SystemMessage(this.systemPrompt),
+        ...historyMessages,
+        new HumanMessage(message),
+      ];
+
+      const forcedResponse = await forcedModel.invoke(primeMessages) as any;
+
+      if (forcedResponse.tool_calls?.length > 0) {
+        const toolCall = forcedResponse.tool_calls[0];
+        const tool = this.tools.find(t => t.name === toolCall.name);
+        if (tool) {
+          logger.info('Forced first tool call', { tool: toolCall.name });
+          const toolResult = await tool.invoke(toolCall.args);
+          forcedToolMessages.push(
+            forcedResponse,
+            new ToolMessage({ content: String(toolResult), tool_call_id: toolCall.id })
+          );
+        }
+      }
+    } catch (err) {
+      logger.warn('Forced first tool call failed — falling back to standard agent', { err });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    try {
       const result = await Promise.race([
         this.agent.invoke({
-          messages: [{ role: 'user', content: message }],
+          messages: [
+            ...chatHistory,
+            { role: 'user', content: message },
+            ...forcedToolMessages, // inject forced first step (empty if failed)
+          ],
         }),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Agent invoke timeout after 120s')), 120000)
+          setTimeout(() => reject(new Error('Agent invoke timeout after 300s')), 300000)
         ),
       ]);
 
@@ -379,7 +431,7 @@ export class LangChainEventAgent {
         logger.warn('Event not found for recommendation', { eventId: rec.eventId });
         return {
           eventId: rec.eventId,
-          score: rec.adjustedScore,
+          score: Math.min(135, rec.adjustedScore),
           rationale: rec.rationale,
         };
       }
@@ -391,7 +443,7 @@ export class LangChainEventAgent {
         city: event.city,
         date: event.date,
         time: event.time,
-        score: rec.adjustedScore,
+        score: Math.min(135, rec.adjustedScore),
         rationale: rec.rationale,
         classification: event.classification,
         priceRange: event.priceRange,

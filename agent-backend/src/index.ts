@@ -9,6 +9,50 @@ import { MCPClient } from './mcpClient.js';
 import { SYSTEM_PROMPT } from './systemPrompt.js';
 import { logger, logApiCall } from './logger.js';
 
+const GUARDRAILS_URL = process.env.GUARDRAILS_URL || 'http://localhost:8001';
+
+/**
+ * Check user input against NeMo Guardrails before passing to the agent.
+ * Fails open — if the guardrails service is down, the request is allowed through.
+ */
+async function checkInputGuardrail(message: string): Promise<{ allowed: boolean; blockedResponse?: string }> {
+  try {
+    const res = await fetch(`${GUARDRAILS_URL}/check-input`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return { allowed: true };
+    const data = await res.json() as { allowed: boolean; blocked_response?: string };
+    return { allowed: data.allowed, blockedResponse: data.blocked_response ?? undefined };
+  } catch {
+    logger.warn('NeMo guardrails service unreachable — failing open on input check');
+    return { allowed: true };
+  }
+}
+
+/**
+ * Check agent output against NeMo Guardrails before sending to the user.
+ * Fails open — returns the original response if the service is down.
+ */
+async function checkOutputGuardrail(userMessage: string, botResponse: string): Promise<string> {
+  try {
+    const res = await fetch(`${GUARDRAILS_URL}/check-output`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_message: userMessage, bot_response: botResponse }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return botResponse;
+    const data = await res.json() as { allowed: boolean; sanitized_response?: string };
+    return data.allowed ? botResponse : (data.sanitized_response ?? botResponse);
+  } catch {
+    logger.warn('NeMo guardrails service unreachable — failing open on output check');
+    return botResponse;
+  }
+}
+
 dotenv.config();
 
 // Also load MCP server's .env to pass to child process
@@ -145,6 +189,24 @@ app.post('/chat-stream', async (req, res) => {
       historyTurns: chatHistory ? chatHistory.length : 0
     });
 
+    // ── NeMo input guardrail ──────────────────────────────────────────────────
+    const inputCheck = await checkInputGuardrail(message);
+    if (!inputCheck.allowed) {
+      logger.warn('NeMo guardrail blocked input', { message: message.substring(0, 100) });
+      const blockedMsg = inputCheck.blockedResponse!;
+      langchainHistory.push({ role: 'user', content: message });
+      langchainHistory.push({ role: 'assistant', content: blockedMsg });
+      res.write(`data: ${JSON.stringify({
+        type: 'final',
+        message: blockedMsg,
+        recommendations: null,
+        history: langchainHistory,
+      })}\n\n`);
+      res.end();
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Create temporary agent with event callback
     const streamingAgent = new LangChainEventAgent(
       langchainMcpClient,
@@ -168,15 +230,22 @@ app.post('/chat-stream', async (req, res) => {
     // Get enriched recommendations
     const recommendations = streamingAgent.getEnrichedRecommendations();
 
+    // ── NeMo output guardrail ─────────────────────────────────────────────────
+    const safeResponse = await checkOutputGuardrail(message, response);
+    if (safeResponse !== response) {
+      logger.warn('NeMo guardrail sanitised agent output');
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Add to history
     langchainHistory.push({ role: 'user', content: message });
-    langchainHistory.push({ role: 'assistant', content: response });
+    langchainHistory.push({ role: 'assistant', content: safeResponse });
 
     // Send final response
     res.write(`data: ${JSON.stringify({
       type: 'final',
-      message: response,
-      recommendations: recommendations,
+      message: safeResponse,
+      recommendations: safeResponse === response ? recommendations : null,
       history: langchainHistory,
     })}\n\n`);
 

@@ -1,0 +1,5 @@
+# Override NeMo's default bot refuse to respond so the block message is
+# always our custom phrase — this lets main.py detect blocks reliably.
+
+define bot refuse to respond
+  "I'm only able to help with event campaign planning. Please ask me about finding events or campaign timing."

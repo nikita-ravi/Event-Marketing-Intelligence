@@ -981,7 +981,6 @@ body {
 }
 
 .calendar-date.highlighted {
-  background: var(--accent-purple);
   border-color: var(--accent-purple);
 }
 
@@ -993,28 +992,20 @@ body {
   text-transform: uppercase;
 }
 
-.calendar-date.highlighted .date-day {
-  color: rgba(255, 255, 255, 0.8);
-}
-
 .date-number {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.calendar-date.highlighted .date-number {
-  color: white;
-}
-
 .date-indicator {
   position: absolute;
-  bottom: calc(var(--spacing-unit) * -0.5);
+  top: calc(var(--spacing-unit) * -0.6);
   left: 50%;
   transform: translateX(-50%);
   width: calc(var(--spacing-unit) * 0.75);
   height: calc(var(--spacing-unit) * 0.75);
-  background: white;
+  background: var(--accent-purple);
   border-radius: 50%;
 }
 

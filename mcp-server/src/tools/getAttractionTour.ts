@@ -44,7 +44,8 @@ function shapeAttraction(rawAttraction: any): Attraction {
  */
 export async function getAttractionTour(
   client: TicketmasterClient,
-  attractionId: string
+  attractionId: string,
+  countryCode?: string
 ): Promise<AttractionTour> {
   // Get attraction details first
   const rawAttraction = await client.getAttractionDetails(attractionId);
@@ -59,12 +60,15 @@ export async function getAttractionTour(
   const startDateTime = now.toISOString().split('.')[0] + 'Z';
   const endDateTime = oneYearFromNow.toISOString().split('.')[0] + 'Z';
 
-  const events = await searchEvents(client, {
+  const searchParams: any = {
     attractionId,
     startDateTime,
     endDateTime,
-    size: 100 // Get up to 100 tour dates
-  });
+    size: 100,
+  };
+  if (countryCode) searchParams.countryCode = countryCode;
+
+  const events = await searchEvents(client, searchParams);
 
   console.log(
     `[Attraction tour] ${attraction.name}: ${events.length} upcoming events`

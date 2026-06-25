@@ -15,11 +15,13 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - TICKETMASTER_API_KEY=${TICKETMASTER_API_KEY}
       - MCP_SERVER_PATH=../mcp-server/dist/index.js
+      - GUARDRAILS_URL=http://guardrails:8001
     volumes:
       # Mount MCP server for stdio communication
       - ./mcp-server/dist:/app/mcp-server/dist:ro
     depends_on:
       - mcp-server
+      - guardrails
     restart: unless-stopped
     networks:
       - app-network
@@ -44,6 +46,27 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+
+  # NeMo Guardrails Service (Python/FastAPI — input/output safety rails)
+  guardrails:
+    build:
+      context: ./guardrails-service
+      dockerfile: Dockerfile
+    container_name: event-marketing-guardrails
+    ports:
+      - "8001:8001"
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - PORT=8001
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   # Frontend Service
   frontend:

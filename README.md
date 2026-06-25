@@ -1,415 +1,340 @@
-# Event Marketing Intelligence Platform
+# Event Campaign Advisor
 
-> An agentic AI system for intelligent event discovery and campaign planning using Ticketmaster data
+An agentic AI application that helps marketers find the best upcoming events to time their ad campaigns around — powered by the Ticketmaster API, LangChain, and NVIDIA NeMo Guardrails.
 
-![Architecture](https://img.shields.io/badge/Architecture-3--Tier-blue)
-![Framework](https://img.shields.io/badge/Framework-LangChain%20%7C%20Anthropic-green)
-![MCP](https://img.shields.io/badge/Protocol-MCP-orange)
-![Status](https://img.shields.io/badge/Status-Production%20Ready-success)
+**Built with [Claude Code](https://www.anthropic.com/claude-code) (agentic IDE)**
 
-## 📋 Table of Contents
+---
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Framework Comparison](#framework-comparison)
-- [Testing](#testing)
-- [Monitoring](#monitoring)
-- [Deployment](#deployment)
-- [Project Structure](#project-structure)
-- [API Documentation](#api-documentation)
+## What It Does
 
-## 🎯 Overview
+You describe your brand and target market. The agent searches Ticketmaster for real upcoming events, scores them deterministically (0–135 points) across six factors, applies LLM reasoning to adjust scores for your specific context, and presents ranked recommendations with transparent rationale. Input and output are filtered by NeMo Guardrails to prevent prompt injection, off-topic queries, and system disclosure.
 
-This project demonstrates a production-ready agentic AI application that combines:
+---
 
-- **Public REST API**: Ticketmaster Discovery API v2
-- **MCP Server Wrapper**: TypeScript-based microservice for API abstraction
-- **LLM Agent Backend**: Dual implementation (LangChain + Anthropic SDK)
-- **React Frontend**: Modern web interface for user interactions
-
-**Built using Claude Code** (agentic IDE) - demonstrating AI-assisted development at its finest.
-
-## 🏗️ Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       Frontend (React)                      │
-│                    http://localhost:5173                    │
-└──────────────────────┬──────────────────────────────────────┘
-                       │ REST API
-┌──────────────────────▼──────────────────────────────────────┐
-│               Agent Backend (Express)                       │
-│              http://localhost:3001                          │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │  Anthropic SDK         │        LangChain          │    │
-│  │  POST /chat            │    POST /chat/langchain   │    │
-│  └────────────────┬──────────────────┬─────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-                       │ stdio
-┌──────────────────────▼──────────────────────────────────────┐
-│                  MCP Server (stdio)                         │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │  Tools: search_events | get_event_details          │    │
-│  │         recommend_campaign_window                   │    │
-│  │         search_attractions | get_attraction_tour   │    │
-│  └────────────────┬────────────────────────────────────┘    │
-└───────────────────┼──────────────────────────────────────────┘
-                    │ HTTP
-┌───────────────────▼──────────────────────────────────────────┐
-│              Ticketmaster Discovery API v2                  │
-│          https://app.ticketmaster.com/discovery/v2          │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│           React Frontend                 │
+│         localhost:5173                   │
+└──────────────┬───────────────────────────┘
+               │ HTTP + SSE
+┌──────────────▼───────────────────────────┐
+│       Express + LangChain Backend        │  ◄── NeMo Guardrails (localhost:8001)
+│         localhost:3001                   │
+└──────────────┬───────────────────────────┘
+               │ stdio (MCP protocol)
+┌──────────────▼───────────────────────────┐
+│           MCP Server                     │
+│    (Ticketmaster API wrapper)            │
+└──────────────┬───────────────────────────┘
+               │ HTTPS
+┌──────────────▼───────────────────────────┐
+│      Ticketmaster Discovery API v2       │
+└──────────────────────────────────────────┘
 ```
 
-### Key Design Decisions
+**Four services:**
 
-1. **MCP Protocol**: Uses Model Context Protocol for clean separation between API layer and agent layer
-2. **Dual Framework Support**: Both LangChain and Anthropic SDK implementations to demonstrate framework versatility
-3. **Type Safety**: Full TypeScript implementation with strict type checking
-4. **Security First**: API keys in .env files, never exposed to frontend
-5. **Observable**: Structured logging with Winston + optional LangSmith monitoring
+| Service | Language | Port | Purpose |
+|---|---|---|---|
+| `frontend/` | React + Vite | 5173 | Chat UI + campaign calendar |
+| `agent-backend/` | Node.js + Express + LangChain | 3001 | LLM agent, tool orchestration, SSE streaming |
+| `mcp-server/` | Node.js + TypeScript | stdio | Ticketmaster API wrapper (MCP protocol) |
+| `guardrails-service/` | Python + FastAPI + NeMo | 8001 | Input/output safety rails |
 
-## ✨ Features
+---
 
-### Core Capabilities
+## Project Structure
 
-- ✅ **Smart Event Discovery**: Natural language search for events with advanced filtering
-- ✅ **Campaign Recommendations**: Deterministic scoring algorithm (0-135 points) with explainable rationale
-- ✅ **Geographic Targeting**: Radius-based search (hyper-local campaigns)
-- ✅ **Artist Tour Tracking**: Follow performers across all tour dates
-- ✅ **Genre Precision**: Ultra-precise audience targeting with genre/sub-genre filters
-- ✅ **Venue Intelligence**: Capacity-based planning with 20,000+ venue database
-- ✅ **Ticket Sales Timing**: On-sale date tracking for launch campaigns
-
-### Advanced Scoring Factors
-
-- Classification Match (50 points): Music, Sports, Arts & Theatre alignment
-- Weekend Timing (30 points): Friday/Saturday/Sunday boost
-- Evening Hours (20 points): Prime-time event timing
-- Premium Pricing (10 points): High-value audience indicator
-- Venue Capacity (15 points): Arena-scale reach potential
-- Distance Proximity (10 points): Hyper-local relevance
-
-**Maximum Score**: 135 points
-
-## 📋 Prerequisites
-
-- **Node.js**: v20+ (LTS recommended)
-- **npm**: v9+ or yarn v1.22+
-- **API Keys**:
-  - [Ticketmaster API Key](https://developer.ticketmaster.com/) (Free tier available)
-  - [Anthropic API Key](https://console.anthropic.com/) (Claude access)
-  - [LangSmith API Key](https://smith.langchain.com/) (Optional, for monitoring)
-
-## 🚀 Quick Start
-
-### 1. Clone and Install
-
-\`\`\`bash
-git clone https://github.com/nikita-ravi/Event-Marketing-Intelligence.git
-cd Event-Marketing-Intelligence
-
-# Install all dependencies
-cd mcp-server && npm install
-cd ../agent-backend && npm install
-cd ../frontend && npm install
-\`\`\`
-
-### 2. Configure Environment Variables
-
-#### MCP Server (.env)
-\`\`\`bash
-cd mcp-server
-cp .env.example .env
-# Edit .env and add your Ticketmaster API key
-\`\`\`
-
-\`\`\`env
-TICKETMASTER_API_KEY=your-ticketmaster-api-key-here
-CACHE_DURATION_MS=900000
-\`\`\`
-
-#### Agent Backend (.env)
-\`\`\`bash
-cd agent-backend
-cp .env.example .env
-# Edit .env and add your Anthropic API key
-\`\`\`
-
-\`\`\`env
-ANTHROPIC_API_KEY=your-anthropic-api-key-here
-PORT=3001
-MCP_SERVER_PATH=../mcp-server/src/index.ts
-
-# Optional: Enable monitoring
-LANGCHAIN_TRACING_V2=false
-LANGCHAIN_API_KEY=your-langsmith-api-key-here
-\`\`\`
-
-### 3. Run the Application
-
-**Option A: Run all services in separate terminals**
-
-\`\`\`bash
-# Terminal 1: Agent Backend (starts MCP server automatically)
-cd agent-backend
-npm run dev
-
-# Terminal 2: Frontend
-cd frontend
-npm run dev
-\`\`\`
-
-**Option B: Using Docker Compose**
-
-\`\`\`bash
-# From project root
-docker-compose up --build
-\`\`\`
-
-### 4. Access the Application
-
-- **Frontend**: http://localhost:5173
-- **Backend**: http://localhost:3001
-- **Health Check**: http://localhost:3001/health
-
-## 🔄 Framework Comparison
-
-This project includes **two implementations** of the agent backend:
-
-| Feature | Anthropic SDK | LangChain |
-|---------|--------------|-----------|
-| **Endpoint** | POST /chat | POST /chat/langchain |
-| **Pros** | Direct API access, latest features, minimal overhead | Framework-agnostic, built-in memory, extensive ecosystem |
-| **Use Case** | Production performance | Multi-model flexibility |
-| **Tracing** | Custom logging | Automatic via LangSmith |
-| **Code** | `src/agent.ts` | `src/langchainAgent.ts` |
-
-Both provide **identical functionality** - choose based on your preference.
-
-## 🧪 Testing
-
-\`\`\`bash
-# Run all tests
-cd mcp-server
-npm test
-
-# Watch mode
-npm run test:watch
-
-# Coverage report
-npm run test:coverage
-
-# UI mode (interactive)
-npm run test:ui
-\`\`\`
-
-**Test Coverage**:
-- ✅ Event search response shaping
-- ✅ Scoring algorithm (all 135 points)
-- ✅ Caching behavior
-- ✅ Data validation
-- ✅ Edge cases
-
-## 📊 Monitoring
-
-### Local Monitoring with LangSmith
-
-1. Sign up at [smith.langchain.com](https://smith.langchain.com) (free tier)
-2. Get your API key from settings
-3. Enable in \`.env\`:
-
-\`\`\`env
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_API_KEY=your-key-here
-LANGCHAIN_PROJECT=event-marketing-agent
-\`\`\`
-
-4. Run the app - traces appear automatically at https://smith.langchain.com
-
-**Features**:
-- 📈 Real-time trace visualization
-- 🔍 Tool call debugging
-- ⏱️ Performance metrics
-- 🎯 Agent reasoning inspection
-
-### Alternative Monitoring Options
-
-- **LangFuse**: Open-source, self-hosted option
-- **Phoenix Arize**: Completely local, no cloud service
-- **Winston Logs**: Check \`agent-backend/logs/combined.log\`
-
-## 🚢 Deployment
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for comprehensive deployment guide including:
-
-- Docker containerization
-- Kubernetes orchestration
-- Serverless deployment (AWS Lambda)
-- Environment configuration
-- Scaling strategies
-- Security hardening
-
-### Quick Docker Deployment
-
-\`\`\`bash
-# Build all images
-docker-compose build
-
-# Run in production mode
-docker-compose up -d
-
-# View logs
-docker-compose logs -f agent-backend
-
-# Stop all services
-docker-compose down
-\`\`\`
-
-## 📁 Project Structure
-
-\`\`\`
-Event-Marketing-Intelligence/
-├── mcp-server/                 # MCP Server (Ticketmaster API wrapper)
+```
+event-marketing/
+├── frontend/                   # React frontend
 │   ├── src/
-│   │   ├── index.ts           # MCP server entry point
-│   │   ├── ticketmasterClient.ts # API client
-│   │   ├── types.ts           # TypeScript interfaces
-│   │   ├── tools/             # MCP tool implementations
-│   │   │   ├── searchEvents.ts
-│   │   │   ├── getEventDetails.ts
-│   │   │   ├── recommendCampaignWindow.ts
-│   │   │   ├── searchAttractions.ts
-│   │   │   └── getAttractionTour.ts
-│   │   └── __tests__/         # Test suite
-│   ├── Dockerfile
-│   ├── package.json
-│   └── vitest.config.ts
-│
-├── agent-backend/             # LLM Agent Backend
-│   ├── src/
-│   │   ├── index.ts          # Express server
-│   │   ├── agent.ts          # Anthropic SDK agent
-│   │   ├── langchainAgent.ts # LangChain agent
-│   │   ├── mcpClient.ts      # MCP client
-│   │   ├── logger.ts         # Winston logging config
-│   │   ├── monitoring.ts     # LangSmith integration
-│   │   └── systemPrompt.ts   # Agent instructions
-│   ├── logs/                 # Winston log files
-│   ├── Dockerfile
-│   └── package.json
-│
-├── frontend/                  # React Frontend
-│   ├── src/
-│   │   ├── App.tsx
-│   │   ├── components/
-│   │   │   ├── ChatWindow.tsx
-│   │   │   ├── EventCard.tsx
-│   │   │   └── ConfirmModal.tsx
-│   │   └── main.tsx
+│   │   ├── App.tsx             # Main app, SSE pipeline handler
+│   │   ├── App.css
+│   │   └── components/
+│   │       ├── ChatWindow.tsx  # Chat interface
+│   │       ├── EventCard.tsx   # Recommendation card UI
+│   │       ├── CalendarStrip.tsx  # Campaign calendar
+│   │       └── ConfirmModal.tsx
 │   ├── Dockerfile
 │   ├── nginx.conf
 │   └── package.json
 │
-├── docker-compose.yml         # Orchestration
-├── DEPLOYMENT.md             # Deployment guide
-└── README.md                 # This file
-\`\`\`
-
-## 📡 API Documentation
-
-### Agent Backend Endpoints
-
-#### POST /chat
-**Description**: Send message to Anthropic SDK agent
-
-\`\`\`bash
-curl -X POST http://localhost:3001/chat \\
-  -H "Content-Type: application/json" \\
-  -d '{"message": "Find music events in Chicago for my restaurant"}'
-\`\`\`
-
-**Response**:
-\`\`\`json
-{
-  "response": "Here are the top 3 events...",
-  "history": [...]
-}
-\`\`\`
-
-#### POST /chat/langchain
-**Description**: Send message to LangChain agent
-
-\`\`\`bash
-curl -X POST http://localhost:3001/chat/langchain \\
-  -H "Content-Type: application/json" \\
-  -d '{"message": "Find music events in Chicago for my restaurant"}'
-\`\`\`
-
-#### POST /reset
-**Description**: Reset conversation history
-
-\`\`\`bash
-curl -X POST http://localhost:3001/reset
-\`\`\`
-
-#### GET /health
-**Description**: Health check
-
-\`\`\`bash
-curl http://localhost:3001/health
-\`\`\`
-
-**Response**:
-\`\`\`json
-{
-  "status": "ok",
-  "agents": {
-    "anthropic": "initialized",
-    "langchain": "initialized"
-  }
-}
-\`\`\`
-
-### MCP Tools
-
-The MCP server exposes 5 tools via stdio:
-
-1. **search_events**: Search for events with filtering
-2. **get_event_details**: Get detailed event information
-3. **recommend_campaign_window**: Score events for campaigns
-4. **search_attractions**: Find artists/teams by keyword
-5. **get_attraction_tour**: Get all tour dates for an attraction
-
-## 🤝 Contributing
-
-This project was built as a technical assessment. For production use:
-
-1. Add rate limiting
-2. Implement input validation
-3. Add authentication/authorization
-4. Configure CORS properly
-5. Add comprehensive error handling
-6. Implement request ID tracking
-7. Add metrics collection
-
-## 📄 License
-
-MIT
-
-## 🙏 Acknowledgments
-
-- Built with [Claude Code](https://www.anthropic.com/claude-code) - AI-powered development
-- Powered by [Anthropic Claude Sonnet 4.5](https://www.anthropic.com/claude)
-- Data from [Ticketmaster Discovery API](https://developer.ticketmaster.com/)
-- Monitoring by [LangSmith](https://smith.langchain.com/)
-- Framework by [LangChain](https://www.langchain.com/)
+├── agent-backend/              # LLM agent backend
+│   ├── src/
+│   │   ├── index.ts            # Express server, SSE endpoint, NeMo integration
+│   │   ├── langchainAgent.ts   # LangChain ReAct agent, tool definitions, forced tool call
+│   │   ├── systemPrompt.ts     # Prompt engineering (security guardrails, query routing, few-shot)
+│   │   ├── mcpClient.ts        # MCP stdio client
+│   │   ├── guardrails.ts       # Event ID validation (hallucination prevention)
+│   │   └── logger.ts           # Winston structured logging
+│   ├── Dockerfile
+│   └── package.json
+│
+├── mcp-server/                 # MCP server — Ticketmaster API wrapper
+│   ├── src/
+│   │   ├── index.ts            # MCP tool registry + request handler
+│   │   ├── ticketmasterClient.ts  # HTTP client for Ticketmaster
+│   │   ├── types.ts            # Shared TypeScript types
+│   │   └── tools/
+│   │       ├── searchEvents.ts
+│   │       ├── getEventDetails.ts
+│   │       ├── scoreEventsBaseline.ts   # Deterministic 0–135 scoring engine
+│   │       ├── searchAttractions.ts
+│   │       └── getAttractionTour.ts
+│   ├── Dockerfile
+│   └── package.json
+│
+├── guardrails-service/         # Python NeMo Guardrails microservice
+│   ├── main.py                 # FastAPI app — /check-input, /check-output, /health
+│   ├── config/
+│   │   ├── config.yml          # NeMo rails config (self check input/output)
+│   │   └── rails.co            # Colang — custom bot refusal message
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── .env.example
+│
+├── docker-compose.yml          # Full stack orchestration
+└── README.md
+```
 
 ---
 
-**Built by**: [Nikita Ravi](https://github.com/nikita-ravi)
-**Repository**: [Event-Marketing-Intelligence](https://github.com/nikita-ravi/Event-Marketing-Intelligence)
-**Status**: Production Ready ✨
+## Prerequisites
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Node.js | v20+ | [nodejs.org](https://nodejs.org) |
+| Python | 3.10+ | For guardrails-service only |
+| Ticketmaster API key | Free | [developer.ticketmaster.com](https://developer.ticketmaster.com/) → Create App |
+| Anthropic API key | Paid | [console.anthropic.com](https://console.anthropic.com/) |
+| NVIDIA API key | Free tier | [build.nvidia.com](https://build.nvidia.com/) → Get API Key (for NeMo Guardrails) |
+
+> The NVIDIA key is only needed for the guardrails service. The main app works without it (guardrails fail open — requests pass through if the service is down).
+
+---
+
+## Setup & Run
+
+### Step 1 — Clone the repo
+
+```bash
+git clone https://github.com/nikita-ravi/Event-Marketing-Intelligence.git
+cd Event-Marketing-Intelligence
+```
+
+### Step 2 — Install Node dependencies
+
+```bash
+cd mcp-server && npm install && cd ..
+cd agent-backend && npm install && cd ..
+cd frontend && npm install && cd ..
+```
+
+### Step 3 — Configure environment variables
+
+**MCP Server** — Ticketmaster key only:
+```bash
+cd mcp-server
+cp .env.example .env
+```
+Edit `.env`:
+```env
+TICKETMASTER_API_KEY=your_ticketmaster_key_here
+```
+
+**Agent Backend** — Anthropic key:
+```bash
+cd agent-backend
+cp .env.example .env
+```
+Edit `.env`:
+```env
+ANTHROPIC_API_KEY=your_anthropic_key_here
+PORT=3001
+MCP_SERVER_PATH=../mcp-server/src/index.ts
+GUARDRAILS_URL=http://localhost:8001
+```
+
+**Guardrails Service** — NVIDIA key:
+```bash
+cd guardrails-service
+cp .env.example .env
+```
+Edit `.env`:
+```env
+NVIDIA_API_KEY=your_nvidia_key_here
+PORT=8001
+```
+
+### Step 4 — Start the services
+
+You need **3 terminals** (4 if running guardrails):
+
+```bash
+# Terminal 1 — Agent backend (also spawns MCP server automatically over stdio)
+cd agent-backend
+npm run dev
+# Expected output: "Agent backend running on http://localhost:3001"
+```
+
+```bash
+# Terminal 2 — Frontend
+cd frontend
+npm run dev
+# Expected output: "Local: http://localhost:5173/"
+```
+
+```bash
+# Terminal 3 — Guardrails service (optional but recommended)
+cd guardrails-service
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8001
+# Expected output: "NeMo Guardrails initialised — meta/llama-3.1-8b-instruct via NVIDIA NIM"
+```
+
+### Step 5 — Open the app
+
+Navigate to **http://localhost:5173**
+
+Try: *"Find country music events in Washington DC in July 2026 for my beer brewery"*
+
+---
+
+## Verify Everything Is Running
+
+```bash
+# Agent backend health
+curl http://localhost:3001/health
+
+# Guardrails health
+curl http://localhost:8001/health
+```
+
+Expected backend response:
+```json
+{ "status": "ok", "agent": "initialized", "architecture": "hybrid-reasoning" }
+```
+
+---
+
+## Docker (Alternative)
+
+Requires Docker and Docker Compose. Create a `.env` file at the project root:
+
+```env
+ANTHROPIC_API_KEY=your_anthropic_key_here
+TICKETMASTER_API_KEY=your_ticketmaster_key_here
+NVIDIA_API_KEY=your_nvidia_key_here
+```
+
+Then:
+```bash
+docker-compose up --build
+```
+
+App available at **http://localhost** (port 80).
+
+---
+
+## The 6 MCP Tools
+
+The MCP Server exposes six tools to the LangChain agent via the Model Context Protocol over stdio:
+
+| Tool | Purpose |
+|---|---|
+| `search_events` | Search Ticketmaster by location, genre, date range, attraction, or radius |
+| `get_event_details` | Full detail for a specific event — pricing, parking, on-sale dates, capacity |
+| `score_events_baseline` | Deterministic 0–135 point scoring engine — auditable, no LLM involved |
+| `search_attractions` | Find any artist, band, or sports team by keyword → returns Ticketmaster ID |
+| `get_attraction_tour` | Pull an attraction's full upcoming tour schedule, optionally filtered by country |
+| `present_recommendation` | Schema-enforced final answer tool — agent must call this to respond |
+
+---
+
+## API Endpoints
+
+### POST /chat-stream
+Main endpoint — returns Server-Sent Events with real-time pipeline steps.
+
+```bash
+curl -X POST http://localhost:3001/chat-stream \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Find jazz events in New Orleans for my restaurant in August 2026"}'
+```
+
+SSE event types: `pipeline` (step updates) → `final` (result with recommendations)
+
+### POST /chat
+Non-streaming fallback — returns full response in one JSON payload.
+
+```bash
+curl -X POST http://localhost:3001/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Find jazz events in New Orleans for my restaurant in August 2026"}'
+```
+
+### POST /reset
+Reset conversation history.
+
+```bash
+curl -X POST http://localhost:3001/reset
+```
+
+### GET /health
+```bash
+curl http://localhost:3001/health
+```
+
+---
+
+## How the Scoring Works
+
+Every event goes through two scoring layers:
+
+1. **Baseline (deterministic)** — `score_events_baseline` in the MCP server scores each event on six fixed factors. No LLM. Always reproducible.
+
+   | Factor | Max Points |
+   |---|---|
+   | Classification match (Music / Sports / Arts) | 50 |
+   | Weekend timing (Fri / Sat / Sun) | 30 |
+   | Evening hours (5 PM+) | 20 |
+   | Premium pricing ($75+) | 10 |
+   | Venue capacity (5,000+ seats) | 15 |
+   | Distance proximity (within 10 miles) | 10 |
+   | **Total** | **135** |
+
+2. **LLM adjustment** — the agent reads the baseline scores and the user's brand context, adjusts scores up or down, and explains every change. The adjusted score is also capped at 135.
+
+Every `eventId` in the final recommendation is validated against the original search results. If the LLM hallucinates an ID, the system automatically falls back to the deterministic baseline output.
+
+---
+
+## NeMo Guardrails
+
+The `guardrails-service` is a standalone Python/FastAPI microservice using NVIDIA NeMo Guardrails 0.10 and `meta/llama-3.1-8b-instruct` via NVIDIA NIM.
+
+It intercepts every request at two points:
+
+- **Input check** (`POST /check-input`) — called before the LangChain agent runs. Blocks: system prompt disclosure attempts, scoring algorithm questions, prompt injection / jailbreak attempts, and off-topic queries.
+- **Output check** (`POST /check-output`) — called after the agent responds. Catches any policy violations in the generated output.
+
+If the guardrails service is unreachable, the main app fails open — requests pass through. The main app never hard-depends on it.
+
+---
+
+## Key Engineering Decisions
+
+**Why MCP over direct HTTP?**
+The LangChain agent never touches the Ticketmaster API directly. The MCP server is the only component that holds the API key and makes HTTP calls. This means the agent layer is completely decoupled from the data layer — swap Ticketmaster for any other events API without changing a line of agent code.
+
+**Why forced `tool_choice: "any"`?**
+Claude at temperature 0.2 is deterministic enough that it will skip tool calls for questions it "knows" the answer to from training data (e.g. artist tour schedules). We force the model to call at least one tool on the first step of every turn — the model still picks which tool based on the system prompt, but it can't skip them entirely.
+
+**Why a deterministic scoring layer?**
+LLM scores alone are a black box. The `score_events_baseline` tool produces an auditable, reproducible score before the LLM sees any results. The LLM's job is to adjust that score based on context the algorithm can't know — brand category, neighbourhood specifics, timing priorities. Both layers are visible to the user.

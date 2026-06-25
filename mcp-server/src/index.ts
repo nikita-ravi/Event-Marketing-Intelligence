@@ -208,6 +208,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: 'string',
               description: 'Ticketmaster attraction ID (get from search_attractions)',
             },
+            countryCode: {
+              type: 'string',
+              description: 'ISO country code to filter events (e.g. "US", "GB", "DE"). Omit for worldwide.',
+            },
           },
           required: ['attractionId'],
         },
@@ -313,8 +317,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_attraction_tour': {
-        const { attractionId } = args as { attractionId: string };
-        const tour = await getAttractionTour(tmClient, attractionId);
+        const { attractionId, countryCode } = args as { attractionId: string; countryCode?: string };
+        const tour = await getAttractionTour(tmClient, attractionId, countryCode);
         return {
           content: [
             {
