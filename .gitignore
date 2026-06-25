@@ -43,6 +43,9 @@ __pycache__/
 *.pyd
 .Python
 
+# Claude Code local IDE config (personal, not part of the project)
+.claude/
+
 # Misc
 *.local
 .cache/
